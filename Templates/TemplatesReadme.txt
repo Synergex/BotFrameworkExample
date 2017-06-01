@@ -1,5 +1,5 @@
 To install these Visual Studio templates, first make sure that you have the following products installed:
-	- Visual Studio 2013 or newer
+	- Visual Studio 2013 or newer (templates developed and tested with VS 2015 Update 3)
 	- Synergy/DE (SDE) 10.3.3c or newer (both 32-bit and 64-bit editions if the OS is 64-bit)
 	- Synergy DBL Integration for Visual Studio (SDI) 10.3.3c or newer
 	

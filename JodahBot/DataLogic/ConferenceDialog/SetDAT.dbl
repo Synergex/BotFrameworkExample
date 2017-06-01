@@ -1,0 +1,27 @@
+import System
+import System.Collections.Generic
+import System.Text
+import Microsoft.Bot.Builder.Dialogs
+import Microsoft.Bot.Connector
+import DataLogic
+
+
+namespace DataLogic.ConferenceDialog
+
+	public partial class ConferenceDialog implements IDialog<object>
+    
+		;It's possible that the DAT logical isn't set correctly during the program's execution
+		;This method tries to fix that.
+		private method SetDAT, void
+
+		proc
+			data value,		string
+			data status,	i4
+			;TODO - Replace hard-coded path with value from Web.config
+			value = "D:\home\site\wwwroot\Data"
+			xcall setlog("DAT", value, status)
+		endmethod
+	
+	endclass
+
+endnamespace

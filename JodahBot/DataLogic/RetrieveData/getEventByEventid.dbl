@@ -1,0 +1,28 @@
+import System
+import System.Collections.Generic
+import System.Text
+import Synergex.SynergyDE.Select
+
+
+namespace DataLogic
+
+	public partial class RetrieveData
+
+		public method getEventByEventID, @System.Collections.ArrayList
+			event_id,	i4
+			endparams
+			record
+				arraylist, @System.Collections.ArrayList
+			endrecord
+		proc
+			data event_rec, event_struct
+			disposable data fobj, @FROM, new from("DAT:events.ism",event_rec)
+			disposable data sobj, @Select, new select(fobj, (where)event_id .eq. event_rec.EVENTID)
+			arraylist = new system.collections.arraylist()
+			foreach event_rec in sobj
+				arraylist.add(event_rec)
+			mreturn arraylist
+		endmethod
+	endclass
+
+endnamespace

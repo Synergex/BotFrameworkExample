@@ -1,0 +1,28 @@
+import System
+import System.Collections.Generic
+import System.Text
+import Synergex.SynergyDE.Select
+
+
+namespace DataLogic
+
+	public partial class RetrieveData
+
+		public method getPresenterByID, @System.Collections.ArrayList
+			pres_id,	i4
+			endparams
+			record
+				arraylist, @System.Collections.ArrayList
+			endrecord
+		proc
+			arraylist = new system.collections.arraylist()
+			data pres_rec, pres_struct
+			disposable data fobj, @FROM, new from("DAT:presenters.ism",pres_rec)
+			disposable data sobj, @Select, new select(fobj, (where)pres_id .eq. pres_rec.PRESENTERID)
+			foreach pres_rec in sobj
+				arraylist.add(pres_rec)
+			mreturn arraylist
+			endmethod
+			endclass
+
+endnamespace

@@ -250,3 +250,9 @@ paket-files/
 # JetBrains Rider
 .idea/
 *.sln.iml
+/JodahBot/ConferenceRepository/something.txt
+/JodahBot/ConferenceRepository/somethingelse.txt
+/JodahBot/JodahBot/Data/FUNFACTS.IS1
+/JodahBot/JodahBot/Data/FUNFACTS.ISM
+/JodahBot/JodahBot/Data/JUNCTION.IS1
+/JodahBot/JodahBot/Data/JUNCTION.ISM

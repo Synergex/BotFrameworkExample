@@ -1,0 +1,294 @@
+import System
+import System.Collections
+import System.Collections.Generic
+import System.Text
+import System.Threading.Tasks
+import Microsoft.Bot.Builder.Dialogs
+import Microsoft.Bot.Connector
+import DataLogic
+
+namespace DataLogic.ConferenceDialog
+
+	public partial class ConferenceDialog implements IDialog<object>
+	
+		private async method SendResponse,	@Task
+			context,				@IDialogContext
+			eventList,				@ArrayList
+			presenterList,			@ArrayList
+			endparams
+		proc
+			data weekday,					[#]string,		new string[#] {"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"}
+			data month,						[#]string,		new string[#] {"Jan.","Feb.","Mar.","Apr.","May","Jun.","Jul.","Aug.","Sep.","Oct.","Nov.","Dec."}
+			data event_rec, event_struct
+			data pres_rec, pres_struct
+			data generalEventList,			@ArrayList,		new ArrayList()		;all events, with duplicates removed
+			data generalPresenterList,		@ArrayList,		new ArrayList()		;all presenters, with duplicates removed
+			data relevantEventList,			@ArrayList,		new ArrayList()		;events that seem important due to repetition
+			data relevantPresenterList,		@ArrayList,		new ArrayList()		;presenters that seem important due to repetition
+			data generalEventIDList,		@ArrayList,		new ArrayList()		;all event IDs, with duplicates removed
+			data generalPresenterIDList,	@ArrayList,		new ArrayList()		;all presenter IDs, with duplicates removed
+			data relevantEventIDList,		@ArrayList,		new ArrayList()		;event IDs that seem important due to repetition
+			data relevantPresenterIDList,	@ArrayList,		new ArrayList()		;presenter IDs that seem important due to repetition
+
+			data rand, @Random, new Random()
+
+			;We have some results! Give them to the user.
+
+			;Let the user know that we have some results
+			using (rand.Next(4)) select
+			(0),
+				begin
+					await context.PostAsync("Here's what I found that matches your query:")
+				end
+			(1),
+				begin
+					await context.PostAsync("Is this what you're looking for?")
+				end
+			(2),
+				begin
+					await context.PostAsync("I found something!")
+				end
+			(3),
+				begin
+					await context.PostAsync("This might be what you want to know:")
+				end
+			(),
+				nop
+			endusing
+
+
+			;filter event list to remove duplicates
+			foreach event_rec in eventList
+			begin
+				if (generalEventIDList.Contains(event_rec.eventid)) then
+				begin
+					;If the current event is already in the general list, then it's a duplicate.
+					;Add it to the relevant list, unless it's there already.
+					if (relevantEventIDList.Contains(event_rec.eventid) == false)
+					begin
+						relevantEventList.Add(event_rec)
+						relevantEventIDList.Add(event_rec.eventid)
+					end
+				end
+				else
+				begin
+					;If it isn't in the general list already, add it.
+					generalEventList.Add(event_rec)
+					generalEventIDList.Add(event_rec.eventid)
+				end
+			end
+
+			;filter presenter list to remove duplicates
+			foreach pres_rec in presenterList
+			begin
+				if (generalPresenterIDList.Contains(pres_rec.presenterid)) then
+				begin
+					;If the current presenter is already in the general list, then it's a duplicate.
+					;Add it to the relevant list, unless it's there already.
+					if (relevantPresenterIDList.Contains(pres_rec.presenterid) == false)
+					begin
+						relevantPresenterList.Add(pres_rec)
+						relevantPresenterIDList.Add(pres_rec.presenterid)
+					end
+				end
+				else
+				begin
+					;If it isn't in the general list already, add it.
+					generalPresenterList.Add(pres_rec)
+					generalPresenterIDList.Add(pres_rec.presenterid)
+				end
+			end
+
+
+			;TODO: If the results are in a particular format, the calling routine will tell us and
+			; we'll display the results accordingly. The primary example would be an event query that
+			; results in a single event and one or more presenters who are presenting the event.
+
+			;If we aren't told about a particular format, we just try our best to determine what to 
+			; display, and we won't make any assumptions (e.g. that a single event with one or more
+			; presenters means that the presenters are associated with the event.
+
+			;Aside from special cases mentioned above, we have to determine how to display results
+			; based on how many of each type there are. In particular, there can be zero, one, or 
+			; more than one event result, and zero, one, or more than one presenter result.
+			;The case where there is no result of either type is handled before this point in code.
+			;So there are three basic cases we have to deal with here:
+			;	1. The results contain event(s) but no presenter,
+			;	2. The results contain presenter(s) but no event, or
+			;	3. The results contain both event(s) and presenter(s). 
+			;
+			;In case 3, we'll just give a simple list of all the results, without giving any details 
+			; that could obscure relevant information. Cases 1 and 2 could default to the same code 
+			; if there are multiple results.
+
+			;To reduce duplicate code, we'll use the following algorithm:
+			;	If no presenter results
+			;		If only one (relevant) event result
+			;			Display details about event
+			;			mreturn
+			;	If no event results
+			;		If only one (relevant) presenter result
+			;			Display details about presenter
+			;			mreturn
+			;	List any event results
+			;	List any presenter results
+			;	Tell user how to get details
+			;	mreturn
+
+			;Reply with details for a single event
+			if (generalPresenterList.Count == 0)
+			begin
+				if (generalEventList.Count == 1)
+				begin
+					;There is only one event, so it must be relevant. We can safely replace the
+					; relevantEventList, because if it contained anything already, it must be
+					; the same as what generalEventList contains.
+					relevantEventList = generalEventList
+				end
+				if (relevantEventList.Count == 1)
+				begin
+					;;Display event details
+					foreach event_rec in relevantEventList
+					begin
+						await Task.Delay(300)
+						await context.PostAsync(%atrim(event_rec.name) + " (Event ID: E" + %string(event_rec.eventid) + ")")
+						await Task.Delay(300)
+						await context.PostAsync("Scheduled from " + FormatTime(event_rec.starttime) + " to " + 
+						&	FormatTime(event_rec.endtime) + " on " + weekday[%WKDAY(event_rec.date)] + ", " + 
+						&	month[event_rec.date(5:2)] + " " + %string(event_rec.date(7:2)) + ", " + string(event_rec.date(1:4))) 
+						await Task.Delay(300)
+						if (%atrim(event_rec.description) .nes. "")
+						begin
+							await context.PostAsync("Description: " + %atrim(event_rec.description) ) 
+						end
+					end
+					mreturn
+				end
+			end
+
+
+			;Reply with details for a single presenter
+			if (generalEventList.Count == 0)
+			begin
+				if (generalPresenterList.Count == 1)
+				begin 
+					;There is only one presenter, so it must be relevant. We can safely replace the
+					; relevantPresenterList, because if it contained anything already, it must be
+					; the same as what generalPresenterList contains.
+					relevantPresenterList = generalPresenterList
+				end
+				if (relevantPresenterList.Count == 1)
+				begin
+					;;Display presenter details
+					foreach pres_rec in relevantPresenterList
+					begin
+						await Task.Delay(300)
+						await context.PostAsync(%atrim(pres_rec.firstname) + " " + %atrim(pres_rec.lastname) 
+						&	+ " (Presenter ID: P" + %string(pres_rec.presenterid) + ")")
+
+						;Show picture, if applicable
+						if (%atrim(pres_rec.image) .nes. "")
+						begin
+							data message1 = context.MakeMessage()
+							message1.Attachments.Add(new Attachment() {ContentUrl = %atrim(pres_rec.image), 
+							&	ContentType = "image/png", Name = %atrim(pres_rec.firstname)})
+							await context.PostAsync(message1)
+						end
+
+						;Print title and company, if applicable
+						await Task.Delay(300)
+						if (%atrim(pres_rec.company) .nes. "")
+						begin
+							if (%atrim(pres_rec.title) .nes. "") then
+							begin
+								await context.PostAsync(%atrim(pres_rec.title) + " at " + %atrim(pres_rec.company) + ".")
+							end
+							else
+							begin
+								await context.PostAsync("Works at " + %atrim(pres_rec.company) + ".")
+							end
+						end
+
+						await Task.Delay(400)
+						if (%atrim(pres_rec.bio) .nes. "")
+						begin
+							await context.PostAsync("Bio: " + %atrim(pres_rec.bio))
+						end
+
+						;TODO: Add code for fun fact
+					end
+					mreturn
+				end
+			end
+
+
+			; Basic output: list all events and presenters
+			; Temporary workaround
+			if (generalEventList.Count > 0)
+			begin
+				foreach event_rec in generalEventList
+				begin
+					await Task.Delay(300)
+					await context.PostAsync(%atrim(event_rec.name) + " (Event ID: E" + %string(event_rec.eventid) + ")")
+				end
+				await context.PostAsync("For details about an event, enter the Event ID, e.g.: 'E" + %string(event_rec.eventid) + "'")
+			end
+
+			if (generalPresenterList.Count > 0) 
+			begin
+				foreach pres_rec in generalPresenterList
+				begin
+					await Task.Delay(300)
+					await context.PostAsync(%atrim(pres_rec.firstname) + " " + %atrim(pres_rec.lastname) 
+					&	+ " (Presenter ID: P" + %string(pres_rec.presenterid) + ")")
+				end
+				await context.PostAsync("For details about a presenter, enter the Presenter ID, e.g.: 'P" + %string(pres_rec.presenterid) + "'")
+			end
+
+;			; Basic output: list all events and presenters
+;			foreach event_rec in generalEventList
+;			begin
+;				await Task.Delay(300)
+;				await context.PostAsync(%atrim(event_rec.name) + " (Event ID: E" + %string(event_rec.eventid) + ")")
+;			end
+;			foreach pres_rec in generalPresenterList
+;			begin
+;				await Task.Delay(300)
+;				await context.PostAsync(%atrim(pres_rec.firstname) + " " + %atrim(pres_rec.lastname) 
+;				&	+ " (Presenter ID: P" + %string(pres_rec.presenterid) + ")")
+;			end
+;
+;			if (generalEventList.Count > 0) await context.PostAsync("For details about an event, enter the Event ID, e.g.: 'E" +
+;				&	%string(event_rec.eventid) + "'")
+;			if (generalPresenterList.Count > 0) await context.PostAsync("For details about a presenter, enter the Presenter ID, e.g.: 'P" +
+;				&	%string(pres_rec.presenterid) + "'")
+
+
+			mreturn
+		endmethod
+
+		private method FormatTime, string
+			inputTime	,d4
+			endparams
+		proc
+			data outputTime	,string
+			data hours, d2, inputTime(1:2) 
+			data minutes, a2
+			minutes = inputTime(3:2), "XX" ;format minutes with leading zeroes
+			if (hours > 12) then
+			begin
+				outputTime = %string(hours - 12) + ":" + minutes + "pm"
+			end
+			else
+			begin
+				if (hours == 0) then outputTime = "12:" + minutes + "am"
+				else if (hours == 12) then outputTime = "12:" + minutes + "pm"
+				else outputTime = %string(hours) + ":" + minutes + "am"
+			end
+			mreturn outputTime
+		endmethod
+
+	endclass
+
+endnamespace
+

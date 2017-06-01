@@ -1,0 +1,77 @@
+import System
+
+.array 0
+import System.Linq
+import System.Net
+import System.Net.Http
+import System.Threading.Tasks
+import System.Web.Http
+import System.Web.Http.Description
+import Microsoft.Bot.Connector
+import Newtonsoft.Json
+import Microsoft.Bot.Builder.Dialogs
+import DataLogic.ConferenceDialog
+
+namespace DataLogic.Controllers
+
+    {BotAuthentication()}
+    public class MessagesController extends ApiController
+
+        ;;;  <summary>
+        ;;;  POST: api/Messages
+        ;;;  Receive a message from a user and send it to ConferenceDialog
+        ;;;  </summary>
+        public async method Post, @Task<HttpResponseMessage>
+            {FromBody()}
+            activity, @Activity 
+            endparams
+        proc
+            if (activity.Type == ActivityTypes.Message) then
+            begin
+                await Conversation.SendAsync(activity, lambda () { new ConferenceDialog() })
+            end
+            else
+            begin
+                HandleSystemMessage(activity)
+            end
+            data response = Request.CreateResponse(HttpStatusCode.OK)
+            mreturn response
+        endmethod
+
+        private method HandleSystemMessage, @Activity
+            message, @Activity 
+            endparams
+        proc
+            if (message.Type == ActivityTypes.DeleteUserData) then
+            begin
+
+            end
+            ;;  Implement user deletion here
+            ;;  If we handle user deletion, return a real message
+            else if (message.Type == ActivityTypes.ConversationUpdate) then
+            begin
+
+            end
+            ;;  Handle conversation state changes, like members being added and removed
+            ;;  Use Activity.MembersAdded and Activity.MembersRemoved and Activity.Action for info
+            ;;  Not available in all channels
+            else if (message.Type == ActivityTypes.ContactRelationUpdate) then
+            begin
+
+            end
+            ;;  Handle add/remove from contact lists
+            ;;  Activity.From + Activity.Action represent what happened
+            else if (message.Type == ActivityTypes.Typing) then
+            begin
+
+            end
+            ;;  Handle knowing tha the user is typing
+            else if (message.Type == ActivityTypes.Ping)
+            begin
+
+            end
+            mreturn ^null
+        endmethod
+    endclass
+endnamespace
+

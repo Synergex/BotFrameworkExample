@@ -1,0 +1,6 @@
+namespace DataLogic
+
+	.include "Presenter" repository, structure="pres_struct", end
+	.include "Event" repository, structure="event_struct", end
+	.include "JUNCTION" repository, structure="junc_struct", end
+endnamespace

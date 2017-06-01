@@ -1,0 +1,54 @@
+import System
+import System.Collections
+import System.Collections.Generic
+import System.Text
+import Synergex.SynergyDE.Select
+
+
+namespace DataLogic
+
+
+	public partial class RetrieveData
+
+		; After the input string is broken into tokens, we want to search the data
+		; files to see if a token matches the name of a presenter. A token may match 
+		; the first name, nickname, or last name of a presenter (or none of the above).
+		; This method queries the files for matches on any of those fields, assembles 
+		; the results, and returns them to the calling routine. 
+		; TODO: Just in case there's a presenter who shows up in multiple lists with the same
+		; token (e.g. "Montgomery Montgomery") the method could also remove duplicates, though
+		; this is not expected in actual usage.
+		public method getPresenterByName, @System.Collections.ArrayList
+			presenterName,	string
+			endparams
+			record
+				masterarraylist,	@System.Collections.ArrayList
+				temparraylist,		@System.Collections.ArrayList
+			endrecord
+		proc
+			data pres_rec, pres_struct
+			masterarraylist = new ArrayList()
+
+			temparraylist = getPresenterByFirstName(presenterName)
+			foreach pres_rec in temparraylist
+			begin
+				masterarraylist.Add(pres_rec)
+			end
+			
+			temparraylist = getPresenterByNickname(presenterName)
+			foreach pres_rec in temparraylist
+			begin
+				masterarraylist.Add(pres_rec)
+			end
+
+			temparraylist = getPresenterByLastName(presenterName)
+			foreach pres_rec in temparraylist
+			begin
+				masterarraylist.Add(pres_rec)
+			end
+
+			mreturn masterarraylist
+		endmethod
+	endclass
+
+endnamespace

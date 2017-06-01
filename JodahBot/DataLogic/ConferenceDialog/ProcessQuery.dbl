@@ -1,0 +1,315 @@
+import System
+import System.Collections
+import System.Collections.Generic
+import System.Text
+import System.Text.RegularExpressions
+import System.Threading.Tasks
+import Microsoft.Bot.Builder.Dialogs
+import Microsoft.Bot.Connector
+import DataLogic
+
+
+namespace DataLogic.ConferenceDialog
+
+	public partial class ConferenceDialog implements IDialog<object>
+	
+		private async method ProcessQuery, @Task
+			context			,@IDialogContext
+			message			,@IMessageActivity
+			;messagetext		,String
+			endparams
+		proc
+			;await context.PostAsync("Who are you?")
+
+			data messagetext,				string,			message.text
+			data myRetrieveData,			@RetrieveData,	new RetrieveData()
+			data eventList,					@ArrayList,		new ArrayList()		;all the events returned by the various routines
+			data presenterList,				@ArrayList,		new ArrayList()		;all the presenters returned by the various routines
+			data isSearchOver,				boolean,		false
+
+			; TODO: Add context-sensitive, state-based responses. 
+			;For now, all queries are treated as seaches with no context.
+
+			;; Parse query
+			;Hard-coded cheats and Easter eggs (hard return)
+			;Search events by ID [match E#]
+			;Search events by time [match 'next']
+			;Search events by name [match 'what','event','session','presentation','break']
+			;Search presenters by ID [match P#]
+			;Search presenters by name [match 'who','presenter','person','name','about']
+			;General search
+			;	Search events first. If no events match, then
+			;	Search presenters.
+
+			;cheat
+			if (Regex.IsMatch(messagetext,"right *now",RegexOptions.IgnoreCase))
+			begin
+				await context.PostAsync("Right now, it's time to learn about Building a BOT with Synergy .NET!")
+				await Task.Delay(200)
+				await context.PostAsync("Presented by Phillip Bratt and Tate Chamberlain")
+				mreturn
+			end
+
+			if (Regex.IsMatch(messagetext,"help",RegexOptions.IgnoreCase))
+			begin
+				await context.PostAsync("I'm here to tell you about events and presenters at the conference.")
+				await Task.Delay(200)
+				await context.PostAsync("If you know the ID of a presenter or event you want to know more about, type it in: e.g 'E24' or 'P4'.")
+				await Task.Delay(200)
+				await context.PostAsync("If you know part of the name of a presenter or event, mention it and I'll look it up, e.g. 'tell me about the presenter named Roger'.")
+				await Task.Delay(200)
+				await context.PostAsync("I'll do my best to find the person or event you want to know about.")
+				await Task.Delay(200)
+				await context.PostAsync("If you're done talking to me, say 'bye'.")
+				await Task.Delay(200)
+				mreturn
+			end
+
+			;use regular expressions to search for keywords
+			;put this code in try/catch to handle possible Synergex errors
+			data catchmsg, string
+			try
+			begin
+
+				if (!isSearchOver && IsMatchEventID(messagetext))				;Search events by ID [match E#]
+				begin
+					data eid, int, getEventID(messagetext)
+					eventList = myRetrieveData.getEventByEventID(eid)
+					if (eventList.Count > 0) isSearchOver = true 
+				end
+				
+				if (!isSearchOver && IsMatchEventName(messagetext))				;Search events by name [match 'what','event','session','presentation','break']
+				begin
+					data tokenList, @ArrayList, new ArrayList()
+					tokenList = tokenizeQuery(messagetext)	
+					data token, string
+					foreach token in tokenList
+					begin
+						;Only test tokens of 4 or more characters. 
+						;Shorter tokens give a lot of false positives.
+						if (token.Length > 4) eventList.AddRange(myRetrieveData.getEventByName(token))
+					end
+					if (eventList.Count > 0) isSearchOver = true 
+					;TODO: consider adding code to automatically search for presenters who match
+					; a matched event, either here or elsewhere.
+				end
+				
+				if (!isSearchOver && IsMatchPresenterID(messagetext))			;Search presenters by ID [match P#]
+				begin
+					data pid, int, getPresenterID(messagetext)
+					presenterList = myRetrieveData.getPresenterByID(pid)
+					if (presenterList.Count > 0) isSearchOver = true 
+				end
+				
+				if (!isSearchOver && IsMatchPresenterName(messagetext))			;Search presenters by name [match 'who','presenter','person','name','about']
+				begin
+					data tokenList, @ArrayList, new ArrayList()
+					tokenList = tokenizeQuery(messagetext)
+					data token, string
+					foreach token in tokenList
+					begin
+						presenterList.AddRange(myRetrieveData.getPresenterByName(token))
+					end
+					if (presenterList.Count > 0) isSearchOver = true 
+				end
+				
+				if (!isSearchOver)																;General search
+				begin
+					data tokenList, @ArrayList, new ArrayList()
+					tokenList = tokenizeQuery(messagetext)
+					data token, string
+					foreach token in tokenList
+					begin
+						;we want to keep short tokens for the name search
+						; and eliminate them for the event search.
+						if (token.Length > 4) eventList.AddRange(myRetrieveData.getEventByName(token))
+						presenterList.AddRange(myRetrieveData.getPresenterByName(token))
+					end
+					if (eventList.Count > 0) isSearchOver = true 
+					if (presenterList.Count > 0) isSearchOver = true 
+				end
+
+				;Reply with the output
+				if (!isSearchOver) then
+				begin
+					;If the queries we've tried so far have yielded any results, let the user know
+					if (isNewConversation) then
+					begin
+						;This is a new conversation, so the user probably din't mean to enter a query right away.
+						;Just say hello.
+						await context.PostAsync("Hello, I'm JodahBot, your agenda assistant for the 2017 Synergex DevPartner Conference. Type 'help' to find out what I can do.")
+					end
+					else
+					begin
+						await context.PostAsync("Sorry, I couldn't find anything that matches your query '" + messagetext + "'")
+					end
+					failureCount += 1
+					if ((failureCount .mod. 3) == 0) await context.PostAsync("Type 'help' if you want to know the types of queries I'll recognize.")
+				end
+				else
+				begin
+					failureCount = 0	;This qurey didn't fail, so reset the failure count
+					;We have some results! Give them to the user.
+					await SendResponse(context,eventList,presenterList)
+				end
+
+			end
+			catch (e,@Synergex.SynergyDE.NoFileFoundException)
+			begin
+				;catchmsg = "Error opening file: " + e.message + " / " + e.source + " / " + e.ToString() 
+				SetDAT()	;Assume that the file wasn't found because DAT wasn't set, and set it.
+				catchmsg = "I'm sorry, I must have misplaced a file somewhere. Could you say that again?"
+			end
+			catch (e,@Exception)
+			begin
+				catchmsg = "Error retrieving data: " + e.message + " " + e.innerexception
+			end
+			endtry
+
+			;Send an error message if something went wrong
+			if (catchmsg != ^null) await context.PostAsync(catchmsg)
+
+
+			;Don't remove the mreturn, genius
+			mreturn
+		endmethod
+
+
+		;Methods to match keywords with regular expressions
+
+
+		;Search events by ID [match E#]
+		private method IsMatchEventID, boolean
+			messagetext	,string
+			endparams
+		proc
+			if (Regex.IsMatch(messagetext,"E\d+",RegexOptions.IgnoreCase)) mreturn true
+			mreturn false
+		endmethod
+
+
+		;Search events by time [match 'next']
+		private method IsMatchEventTime, boolean
+			messagetext	,string
+			endparams
+		proc
+			if (Regex.IsMatch(messagetext,"next",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"now",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"day",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"next",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"\d+:\d\d",RegexOptions.IgnoreCase)) mreturn true
+			mreturn false
+		endmethod
+
+
+		;Search events by name [match 'what','event','session','presentation','break']
+		private method IsMatchEventName, boolean
+			messagetext	,string
+			endparams
+		proc
+			if (Regex.IsMatch(messagetext,"what",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"event",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"session",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"presentation",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"break",RegexOptions.IgnoreCase)) mreturn true
+			mreturn false
+		endmethod
+
+
+		;Search presenters by ID [match P#]
+		private method IsMatchPresenterID, boolean
+			messagetext	,string
+			endparams
+		proc
+			if (Regex.IsMatch(messagetext,"P\d+",RegexOptions.IgnoreCase)) mreturn true
+			mreturn false
+		endmethod
+
+
+		;Search presenters by name [match 'who','presenter','person','about']
+		private method IsMatchPresenterName, boolean
+			messagetext	,string
+			endparams
+		proc
+			if (Regex.IsMatch(messagetext,"who",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"presenter",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"person",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"name",RegexOptions.IgnoreCase)) mreturn true
+			if (Regex.IsMatch(messagetext,"about",RegexOptions.IgnoreCase)) mreturn true
+			mreturn false
+		endmethod
+
+
+		;Extract event ID from messagetext
+		private method getEventID, int
+			inputstring, string
+			endparams
+		proc
+			data messagetext = inputstring
+			messagetext = Regex.Match(messagetext,"E\d+",RegexOptions.IgnoreCase).Value
+			messagetext = Regex.Replace(messagetext,"E","",RegexOptions.IgnoreCase)
+			data eid, int
+			eid = messagetext
+			mreturn eid
+		endmethod
+
+
+		;Extract presenter ID from messagetext
+		private method getPresenterID, int
+			inputstring, string
+			endparams
+		proc
+			data messagetext = inputstring
+			messagetext = Regex.Match(messagetext,"P\d+",RegexOptions.IgnoreCase).Value
+			messagetext = Regex.Replace(messagetext,"P","",RegexOptions.IgnoreCase)
+			data pid, int
+			pid = messagetext
+			mreturn pid
+		endmethod
+
+
+		;Split the message text into tokens, and ignore ones that match common patterns
+		private method tokenizeQuery, @ArrayList
+			messagetext,	string
+			endparams
+		proc
+			data token, string
+			data tokens, [#]string
+			data tokenlist, @ArrayList, new ArrayList()
+			data minTokenLength = 2
+
+			data seperators, [#]char, new char[#] {" ",",",".","?"}
+			tokens = messagetext.Split(seperators)
+
+			foreach token in tokens
+			begin
+				if ((token.Length > (minTokenLength - 1)) &&
+				&	(!Regex.IsMatch(token,"of",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"the",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"E\d+",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"next",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"what",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"event",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"session",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"presentation",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"break",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"P\d+",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"who",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"presenter",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"person",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"name",RegexOptions.IgnoreCase)) &&
+				&	(!Regex.IsMatch(token,"about",RegexOptions.IgnoreCase)))
+				begin
+					tokenlist.Add(token)
+				end
+			end
+
+			mreturn tokenlist
+		endmethod
+
+
+	endclass
+
+endnamespace
+
+

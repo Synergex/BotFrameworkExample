@@ -1,0 +1,104 @@
+import System
+import System.Collections
+import System.Collections.Generic
+import System.Text
+import System.Text.RegularExpressions
+import System.Threading.Tasks
+import Microsoft.Bot.Builder.Dialogs
+import Microsoft.Bot.Connector
+import DataLogic
+
+
+namespace DataLogic.ConferenceDialog
+
+	{Serializable}
+	public partial class ConferenceDialog implements IDialog<object>
+    
+		protected isExistingConversation	,boolean	,false
+		protected isNewConversation			,boolean	,false
+		protected failureCount				,int		,0			;keeps track of how many times a query has returned no results
+
+		public async method StartAsync,	@Task
+			context		,@IDialogContext
+			endparams
+		proc
+			context.Wait(MessageReceivedAsync)
+		endmethod
+
+		public async method MessageReceivedAsync, @Task
+			context		,@IDialogContext
+			argument	,@IAwaitable<IMessageActivity>
+			endparams
+
+		proc
+;			data message	,@IMessageActivity
+;			message = await argument
+			data message, @IMessageActivity, await argument
+			data isMessageRelevant, boolean,	true
+
+			;ignore this message if this is a new group conversation that doesn't mention JodahBot,
+			;otherwise, assume that it is relevant
+			if (isExistingConversation == false &&
+			&	message.Conversation.IsGroup == true &&
+			&	Regex.IsMatch(message.text,"jodahbot",RegexOptions.IgnoreCase) == false)
+			begin
+				isMessageRelevant = false
+			end
+
+			;reset the (existing) conversation when the user says to
+			if (isExistingConversation)
+			begin
+				if (Regex.IsMatch(message.text,"reset",RegexOptions.IgnoreCase) ||
+				&	Regex.IsMatch(message.text,"bye",RegexOptions.IgnoreCase) ||
+				&	Regex.IsMatch(message.text,"that'*s *all",RegexOptions.IgnoreCase))
+				begin
+					await ResetAsync(context,argument)
+					isMessageRelevant = false
+				end
+			end
+			
+			if (isMessageRelevant)
+			begin
+				if (!isExistingConversation)
+				begin
+					isExistingConversation = true
+					isNewConversation = true
+				end
+				await ProcessQuery(context, message)
+				isNewConversation = false
+			end
+
+			;await context.PostAsync("I'm JodahBot")
+			if (Regex.IsMatch(message.text,"jodahbot",RegexOptions.IgnoreCase))
+			begin
+				await context.PostAsync("Hey, you said my name!")
+			end
+
+			;Make sure to receive the next message
+			context.Wait(MessageReceivedAsync)
+			;Don't remove the mreturn, genius
+			mreturn
+		endmethod
+
+
+		;reset all data for the current conversation
+		public async method ResetAsync, @Task
+			context, @IDialogContext 
+			argument, @IAwaitable<IMessageActivity> 
+			endparams
+		proc
+			isExistingConversation = false
+			failureCount = 0
+			data message, @IMessageActivity, await argument
+
+			data replystring = string.empty
+			if (message.Conversation.IsGroup) then replystring = "Ending the conversation for now. Mention JodahBot to talk to me again."
+			else replystring = "Ending the conversation for now. Feel free to talk to me again."
+
+			await context.PostAsync(replystring)
+			mreturn
+		endmethod	;ResetAsync
+
+	endclass
+
+endnamespace

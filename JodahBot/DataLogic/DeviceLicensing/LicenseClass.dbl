@@ -1,0 +1,147 @@
+import System
+import System.Collections.Generic
+import System.Text
+import System.Threading.Tasks
+import Synergex.SynergyDE.DeviceLicensing
+
+;TODO - Fill in the PublicKey and AppGUID for this app (Synergex Device Licensing)
+{assembly:Synergex.SynergyDE.DeviceLicensing.SynergyDeviceLicense(PublicKey="TODO", AppGUID="TODO", Class=^typeof(DataLogic.DeviceLicensing.LicenseClass))}
+
+namespace DataLogic.DeviceLicensing
+
+	public class LicenseClass implements ISynergyDeviceCallback
+
+		;Implement ISynergyDeviceCallback methods ---------------------------------------------------------------------
+		public method Init	,@Task
+		proc
+
+			data myTask, @Task<LicenseError>
+			myTask = DeviceLicensing.GetDeviceGUID()
+			if myTask.Result == LicenseError.NotFound
+			begin
+				;deactivate device
+				myTask = DeviceLicensing.Deactivate()	
+			end 
+			mreturn myTask
+		endmethod
+		
+
+		public method ActivationDialog	,@Task
+			
+		proc
+			data repeatFlag = true
+			
+			data DeviceDesc, String 
+			data myTask, @Task<LicenseError>
+			
+			while (repeatFlag) do
+			begin
+				repeatFlag = false	;only iterate this loop once, unless something changes
+				
+				;Generate Device Description
+				data id			,i4
+				data parent_id	,i4
+				data group_id	,i4
+				xcall JBNO(id, parent_id, group_id)
+				DeviceDesc = "AzureAppService-" + %string(group_id) + "-" + %string(id)
+
+				;TODO: replace these values with the a token and password associated with this device license
+				myTask = DeviceLicensing.Activate("TODO","TODO",DeviceDesc)
+				
+				if (myTask.Result == LicenseError.None) then
+				begin
+					;License activated
+				end
+				else
+				begin
+					;License not activated. There's usually code here to handle licensing failures,
+					; but for this simple example we'll just assume that everything works fine.
+				end
+			end
+			
+			mreturn myTask
+		endmethod
+		
+		public async method Synchronize, @System.Threading.Tasks.Task
+			a_isblocking		,boolean
+			endparams
+		proc
+			data myTask		,@System.Threading.Tasks.Task
+			data rtn, LicenseError
+			rtn = await DeviceLicensing.Synchronize(true)
+			if (rtn == LicenseError.Revoked) then
+			begin
+				stop
+			end
+			else if (rtn == LicenseError.Expired) then
+			begin
+				stop
+			end
+			else if (rtn == LicenseError.None) then
+			begin
+				;License Sync Successful
+			end
+			else
+			begin
+				;Error Running Sync
+			end
+		endmethod
+
+		public static async method CheckToSync, void
+			reauth,	boolean
+		proc
+			data licInfo,	@LicenseInfo
+			licInfo = DeviceLicensing.GetLicenseInfo()
+			if (licInfo != ^null)
+			begin
+				data tspan = (licInfo.Expiration - DateTime.Now)
+				if (licInfo.Status != LicenseStatus.Active || tspan.TotalDays < 7)
+				begin
+					data rtn, LicenseError, await DeviceLicensing.Synchronize(false)
+					if (rtn == LicenseError.Revoked) then
+					begin
+						;Error Running Sync
+						stop
+					end
+					else if (rtn == LicenseError.Expired) then
+					begin
+						;Error Running Sync
+						stop
+					end
+					else if (rtn == LicenseError.None) then
+					begin
+						;License Sync Successful
+					end
+					else
+					begin
+						;Error Running Sync
+					end
+				end
+			end
+		endmethod
+		;End implement methods-------------------------------------------------------------
+	
+		;Borrowed from Jim's code (WpfDeviceLicense on CodeExchange)
+		public static method ErrorMessage, string
+			lerr, LicenseError
+		proc
+			case (lerr) of
+			begincase
+			LicenseError.Connectivity: mreturn "Trouble connecting to license server"
+			LicenseError.DeviceMismatch: mreturn "License does not match device"
+			LicenseError.Expired: mreturn "License has expired"
+			LicenseError.Revoked: mreturn "License has been revoked"
+			LicenseError.Unauthorized: mreturn "Invalid username or password"
+			LicenseError.NoSlots: mreturn "No more device license slots available"
+			LicenseError.Timeout: mreturn "Timeout connecting to license server"
+			LicenseError.DuplicateDevice: mreturn "Duplicate device description"
+			LicenseError.MultipleInit: mreturn "Multiple initializations of device"
+			LicenseError.InvalidAttribute: mreturn "AppGuid or PublicKey in SynergyDeviceLicenseAttribute is invalid"
+			LicenseError.NotFound: mreturn "Device GUID not found"
+			endcase
+			mreturn lerr.ToString()
+		end
+
+	endclass
+
+endnamespace
