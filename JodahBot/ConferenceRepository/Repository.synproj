@@ -42,11 +42,6 @@
   <ItemGroup>
     <Compile Include="repository.scm" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="something.txt">
-      <SubType>Content</SubType>
-    </Compile>
-  </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Synergex\dbl\Synergex.SynergyDE.Repository.targets" />
   <PropertyGroup>
     <PreBuildEvent>
