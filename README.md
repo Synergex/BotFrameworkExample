@@ -4,7 +4,7 @@ An example of using Synergy .NET to implement a BOT using the Microsoft BOT Fram
 This Repository contains resources to help you get started building a Bot with Synergy .NET:
 - Templates: Visual Studio templates.
 - Tutorial: *Coming soon*
-- Code Example: *Coming soon*
+- JodahBot: An example Bot designed for and demonstrated at the Synergex's 2017 DevPartner Conference
 
 In addition, you can check out these external links, which can help you to get going with Microsoft's Bot Framework (not Synergy specific):
 - Bot Framework portal: https://dev.botframework.com/
@@ -15,4 +15,4 @@ In addition, you can check out these external links, which can help you to get g
 
 For Synergy-specific information, see:
 - This Repository: https://github.com/Synergex/BotFrameworkExample 
-- The presentation from Synergex's 2017 DevPartnerConference: *Coming soon*
+- The presentation from Synergex's 2017 DevPartner Conference: *Coming soon*
