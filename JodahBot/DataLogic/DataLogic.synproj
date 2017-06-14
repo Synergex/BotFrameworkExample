@@ -187,9 +187,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConferenceDialog\ProcessQuery.dbl" />
-    <Compile Include="ConferenceDialog\ReplyWithPresenterByName.dbl" />
     <Compile Include="ConferenceDialog\ConferenceDialog.dbl" />
-    <Compile Include="ConferenceDialog\ReplyWithPresenterByID.dbl" />
     <Compile Include="ConferenceDialog\SendResponse.dbl" />
     <Compile Include="ConferenceDialog\SetDAT.dbl" />
     <Compile Include="Controllers\MessagesController.dbl" />
