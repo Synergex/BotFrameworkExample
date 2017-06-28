@@ -15,4 +15,4 @@ In addition, you can check out these external links, which can help you to get g
 
 For Synergy-specific information, see:
 - This Repository: https://github.com/Synergex/BotFrameworkExample 
-- The presentation from Synergex's 2017 DevPartner Conference: https://www.youtube.com/watch?v=P4p5OJldP8g&t=133s
+- The presentation from Synergex's 2017 DevPartner Conference: https://www.youtube.com/watch?v=P4p5OJldP8g
